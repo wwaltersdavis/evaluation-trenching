@@ -1,4 +1,4 @@
-# Trenching tool to estimate strengths of trenching layouts
+# Evaluation trenching
 
 ## Aims
 Create a model to assess and aid archaeological evaluations in the UK. 
