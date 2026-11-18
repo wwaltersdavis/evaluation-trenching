@@ -2,7 +2,7 @@
 resolver = "2"
 
 members = [
-    "optimisation",
+    "evaluation",
     "preprocessing/group_to_loe",
 ]
 

@@ -109,6 +109,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e9c71c2167ca323c882b99918929403426e2373ea17242ff5653e0d5e1058be"
 
 [[package]]
+name = "evaluation"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "csv",
+ "fs-err",
+ "geo",
+ "geojson",
+ "rayon",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "float_next_after"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -652,20 +666,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fd3ca314f692efd6c868f8408f53fe444634a845f96c028b97d35f6a1f79f0ee"
 dependencies = [
  "serde_core",
-]
-
-[[package]]
-name = "trenching_optimisation"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "csv",
- "fs-err",
- "geo",
- "geojson",
- "rayon",
- "serde",
- "serde_json",
 ]
 
 [[package]]

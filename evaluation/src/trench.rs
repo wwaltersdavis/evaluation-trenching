@@ -4,8 +4,8 @@ use geo::{
 };
 use rayon::prelude::*;
 use std::panic;
-use trenching_optimisation::array::{Configuration, PatternRotationAxis};
-use trenching_optimisation::{
+use evaluation::array::{Configuration, PatternRotationAxis};
+use evaluation::{
     Degree, Distribution, Percentage, Rectangle, Structure, TrenchConfig, TrenchLayout,
 };
 

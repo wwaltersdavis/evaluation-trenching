@@ -1,6 +1,6 @@
 use crate::statistics::StatsMap;
 use geo::{Area, BooleanOps, BoundingRect, Intersects, MultiPolygon};
-use trenching_optimisation::{ArchFeature, TrenchLayout};
+use evaluation::{ArchFeature, TrenchLayout};
 
 fn excavated_overlap_area(feature: &MultiPolygon<f64>, trenches: &TrenchLayout) -> f64 {
     if !feature.intersects(&trenches.layout) {

@@ -5,7 +5,7 @@ use geojson::{Feature, GeoJson};
 use std::io::BufReader;
 use std::time::Instant;
 
-use trenching_optimisation::{ArchFeature, TestLocation};
+use evaluation::{ArchFeature, TestLocation};
 
 fn read_single_features_geojson(site_name: String, loe_i: String) -> Result<GeoJson> {
     let file = File::open(format!(

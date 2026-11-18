@@ -5,7 +5,7 @@ use crate::{
 use anyhow::Result;
 use csv::Writer;
 use serde::Serialize;
-use trenching_optimisation::Distribution;
+use evaluation::Distribution;
 
 fn two_dp(value: f64) -> String {
     format!("{:.2}", value)

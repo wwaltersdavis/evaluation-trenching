@@ -7,7 +7,7 @@ use anyhow::Result;
 use rayon::prelude::*;
 use std::time::Instant;
 
-use trenching_optimisation::TrenchConfig;
+use evaluation::TrenchConfig;
 
 pub fn all_loes(config: &TrenchConfig, selected_layer: Option<&str>) -> Result<()> {
     println!("\nRunning {:?} on all LOEs", config.pattern_name);

@@ -5,7 +5,7 @@ mod statistics;
 mod trench;
 
 use anyhow::Result;
-use trenching_optimisation::{Distribution, Percentage, TrenchConfig};
+use evaluation::{Distribution, Percentage, TrenchConfig};
 
 fn main() -> Result<()> {
     let selected_layer: Option<&str> = None;

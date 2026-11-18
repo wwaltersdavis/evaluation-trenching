@@ -1,6 +1,6 @@
 use crate::statistics::{mean, percentile, standard_deviation};
 use std::collections::HashMap;
-use trenching_optimisation::Percentage;
+use evaluation::Percentage;
 
 /// Represents the detection statistics for a given group of features.
 /// The features are grouped by site, category, and category value e.g.
