@@ -10,7 +10,7 @@ site. This means that the variation that might have been produced by other equal
 remains unknown. The potential false negatives and biases associated with this widely used sampling strategy therefore 
 remain unquantified. 
 
-This builds on previous work ([Higham, 2024]((https://cris.brighton.ac.uk/ws/portalfiles/portal/50172170/RichardHigham_thesis_University_of_Brighton_corrected_17052024.pdf))) 
+This builds on previous work ([Higham, 2024](https://cris.brighton.ac.uk/ws/portalfiles/portal/50172170/RichardHigham_thesis_University_of_Brighton_corrected_17052024.pdf))
 to simulate trenching layouts to assess these sampling strategies to aid in archaeological evaluations. 
 
 ## License
