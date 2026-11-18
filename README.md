@@ -1,13 +1,18 @@
 # Evaluation trenching
 
-## Aims
-Create a model to assess and aid archaeological evaluations in the UK. 
-Building on [previous work](https://cris.brighton.ac.uk/ws/portalfiles/portal/50172170/RichardHigham_thesis_University_of_Brighton_corrected_17052024.pdf) (Higham, 2024) this model moves away from a python simulation of trenching layouts and creates a tool in which a user can input the coordinates of the boundaries of a site, the type of archaeology searched for, the dimensions of the trench, and the percentage coverage of trenching in the budget. This model then produces an optimal layout based on the coverage available and measure of how likely the layout is to find the archaeology imputed. 
+## Background
+Since the introduction of developer-funded archaeology in England in 1990, archaeological evaluation has been used to 
+identify and characterise remains before planning decisions are made. Systematic evaluation trenching is the most widely 
+used intrusive evaluation technique, which samples a proportion of an area to investigate the presence, nature, extent 
+and condition of archaeological remains to inform decisions about their significance and treatment. However, evaluation 
+trenching normally takes place only once and the resulting sample becomes the principal archaeological evidence for the 
+site. This means that the variation that might have been produced by other equally valid evaluation trenching placements
+remains unknown. The potential false negatives and biases associated with this widely used sampling strategy therefore 
+remain unquantified. 
 
+This builds on previous work ([Higham, 2024]((https://cris.brighton.ac.uk/ws/portalfiles/portal/50172170/RichardHigham_thesis_University_of_Brighton_corrected_17052024.pdf))) 
+to simulate trenching layouts to assess these sampling strategies to aid in archaeological evaluations. 
 
-## Installation
-The easiest way to install on OSX is with:
+## License
 
-```sh
-$ curl https://sh.rustup.rs -sSf | sh
-```
+Licensed under Apache License, Version 2.0 ([LICENSE](LICENSE) or http://www.apache.org/licenses/LICENSE-2.0)
