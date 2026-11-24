@@ -1,6 +1,6 @@
 use crate::statistics::StatsMap;
-use geo::{Area, BooleanOps, BoundingRect, Intersects, MultiPolygon};
 use evaluation::{ArchFeature, TrenchLayout};
+use geo::{Area, BooleanOps, BoundingRect, Intersects, MultiPolygon};
 
 fn excavated_overlap_area(feature: &MultiPolygon<f64>, trenches: &TrenchLayout) -> f64 {
     if !feature.intersects(&trenches.layout) {
@@ -45,6 +45,7 @@ pub fn test_features_for_layout<'a>(
     features: &'a Vec<ArchFeature>,
     trenches: &TrenchLayout,
     site: &'a str,
+    loe_id: &'a str,
 ) -> StatsMap<'a> {
     let mut stats_map_for_layout = StatsMap::new();
 
@@ -55,6 +56,7 @@ pub fn test_features_for_layout<'a>(
         for (category, category_value) in feature.iter_categories() {
             stats_map_for_layout.add_from_feature(
                 site,
+                loe_id,
                 category,
                 category_value,
                 excavated_area > 0.0,

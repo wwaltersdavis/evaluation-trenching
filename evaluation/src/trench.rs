@@ -1,17 +1,57 @@
-use geo::{
-    coord, Area, BooleanOps, Centroid, Distance, Euclidean, Intersects, LineString, MultiPolygon,
-    Point, Polygon, Rotate, Translate,
-};
-use rayon::prelude::*;
-use std::panic;
 use evaluation::array::{Configuration, PatternRotationAxis};
 use evaluation::{
     Degree, Distribution, Percentage, Rectangle, Structure, TrenchConfig, TrenchLayout,
 };
+use geo::{
+    coord, Area, BooleanOps, Centroid, Distance, Euclidean, Intersects, LineString, MultiPolygon,
+    Point, Polygon, Rotate, Translate,
+};
+use rand::{RngExt, SeedableRng};
+use rand_chacha::ChaCha8Rng;
+use rayon::prelude::*;
+use std::panic;
 
+#[derive(Debug, Clone, Copy)]
+pub struct PlacementSettings {
+    pub number_of_layouts_per_area: usize,
+    pub seed: u64,
+}
+
+impl Default for PlacementSettings {
+    fn default() -> Self {
+        Self {
+            number_of_layouts_per_area: 180,
+            seed: 20261124,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct Placement {
+    angle_degrees: f64,
+    x_phase: f64,
+    y_phase: f64,
+}
+fn generate_placements(
+    structure: Structure,
+    number_of_layouts: usize,
+    seed: u64,
+) -> Vec<Placement> {
+    let mut rng = ChaCha8Rng::seed_from_u64(seed);
+    let maximum_angle = structure.get_rotational_symmetry() as f64;
+
+    (0..number_of_layouts)
+        .map(|_| Placement {
+            angle_degrees: rng.random_range(0.0..maximum_angle),
+            x_phase: rng.random_range(0.0..1.0),
+            y_phase: rng.random_range(0.0..1.0),
+        })
+        .collect()
+}
 pub fn create_layouts(
     config: &TrenchConfig,
     limit_of_excavation: Polygon,
+    placement_settings: PlacementSettings,
 ) -> Option<Vec<TrenchLayout>> {
     let centroid = limit_of_excavation.centroid().unwrap();
     let max_distance_from_centroid = get_max_distance_from_centroid(centroid, &limit_of_excavation);
@@ -30,12 +70,13 @@ pub fn create_layouts(
             max_distance_from_centroid,
             centroid,
             coverage,
+            placement_settings,
         ),
     }
 }
 
 fn get_size_of_grid(max_distance_from_centroid: &f64, spacing: &f64) -> i32 {
-    (max_distance_from_centroid / spacing).floor() as i32
+    (max_distance_from_centroid / spacing).ceil() as i32 + 2
 }
 
 fn spacing_smaller_than_minimum(spacing: &f64, minimum_spacing: &f64) -> bool {
@@ -122,32 +163,32 @@ fn get_layouts_from_coverage(
     max_distance_from_centroid: f64,
     centroid: Point,
     coverage: Percentage,
+    placement_settings: PlacementSettings,
 ) -> Option<Vec<TrenchLayout>> {
     let estimated_spacing = estimate_spacing(&config, &coverage);
     if spacing_smaller_than_minimum(&estimated_spacing, &config.minimum_spacing) {
         return None;
     }
-    let trenches = get_layout_from_spacing(
-        config,
-        max_distance_from_centroid,
-        centroid,
-        estimated_spacing,
+    let placements = generate_placements(
+        config.structure,
+        placement_settings.number_of_layouts_per_area,
+        placement_settings.seed,
     );
-    // in parallel iterate over all
+
     let limit_of_excavation = MultiPolygon(vec![limit_of_excavation.clone()]);
 
-    let trench_patterns: Vec<TrenchLayout> = (0..config.structure.get_rotational_symmetry())
-        // let trench_patterns: Vec<TrenchLayout> = (171..172)
+    let trench_patterns: Vec<TrenchLayout> = placements
         .into_par_iter()
-        .filter_map(|rotation| {
+        .enumerate()
+        .filter_map(|(layout_index, placement)| {
             adjust_trench_layout_to_coverage(
-                &trenches,
                 coverage.0,
                 centroid,
                 &limit_of_excavation,
                 estimated_spacing,
                 &config,
-                rotation,
+                placement,
+                layout_index,
                 &max_distance_from_centroid,
             )
         })
@@ -156,6 +197,31 @@ fn get_layouts_from_coverage(
         return None;
     }
     Some(trench_patterns)
+}
+fn get_positioned_layout(
+    config: TrenchConfig,
+    max_distance_from_centroid: f64,
+    centroid: Point,
+    spacing: f64,
+    placement: Placement,
+) -> MultiPolygon {
+    let (x_shift, y_shift) = match config.structure {
+        Structure::Parallel(_) => (placement.x_phase * spacing, 0.0),
+        Structure::Array(rectangle, array_config) => {
+            let y_spacing = if array_config.separated {
+                rectangle.length + 1.0
+            } else {
+                spacing
+            };
+
+            (placement.x_phase * spacing, placement.y_phase * y_spacing)
+        }
+    };
+
+    let shifted_origin = centroid.translate(x_shift, y_shift);
+
+    get_layout_from_spacing(config, max_distance_from_centroid, shifted_origin, spacing)
+        .rotate_around_point(placement.angle_degrees, centroid)
 }
 
 fn get_layouts_from_spacing(
@@ -180,8 +246,8 @@ fn get_layout_from_spacing(
     centroid: Point,
     spacing: f64,
 ) -> MultiPolygon {
-    let n = get_size_of_grid(&max_distance_from_centroid, &spacing);
-    let x_offsets = -n..n + 1;
+    let x_count = get_size_of_grid(&max_distance_from_centroid, &spacing);
+    let x_offsets = -x_count..x_count + 1;
     let trenches = match config.structure {
         Structure::Parallel(line) => {
             x_offsets
@@ -199,7 +265,14 @@ fn get_layout_from_spacing(
             // TODO: test performance of this vs .push() to Vec
         }
         Structure::Array(rectangle, array_config) => {
-            let y_offsets = -n..n + 1;
+            let y_spacing = if array_config.separated {
+                rectangle.length + 1.0
+            } else {
+                spacing
+            };
+
+            let y_count = get_size_of_grid(&max_distance_from_centroid, &y_spacing);
+            let y_offsets = -y_count..y_count + 1;
             x_offsets
                 .into_par_iter()
                 .enumerate()
@@ -281,12 +354,17 @@ fn get_rotated_trench_patterns(
                 return None;
             };
 
-            let _percentage_coverage =
+            let achieved_coverage =
                 calculate_coverage(&intersection, &limit_of_excavation_as_multi);
 
             Some(TrenchLayout {
                 layout: intersection,
                 trenches_deployed,
+                layout_index: rotation as usize,
+                angle_degrees: rotation as f64,
+                x_phase: 0.0,
+                y_phase: 0.0,
+                achieved_coverage,
             })
         })
         .collect()
@@ -298,45 +376,47 @@ fn check_coverage(current_coverage: f64, target_coverage: f64) -> bool {
 }
 
 fn adjust_trench_layout_to_coverage(
-    trench_pattern: &MultiPolygon,
     target_coverage: f64,
     centroid: Point,
     limit_of_excavation: &MultiPolygon,
     estimated_spacing: f64,
     config: &TrenchConfig,
-    rotation: i32,
+    placement: Placement,
+    layout_index: usize,
     max_distance_from_centroid: &f64,
 ) -> Option<TrenchLayout> {
     let mut iteration = 0;
     let mut current_spacing = estimated_spacing;
-    let mut current_trench_pattern = trench_pattern.rotate_around_point(rotation as f64, centroid);
+
+    let mut current_trench_pattern = get_positioned_layout(
+        *config,
+        *max_distance_from_centroid,
+        centroid,
+        current_spacing,
+        placement,
+    );
+
     let Some(mut intersection) = safe_intersection(limit_of_excavation, &current_trench_pattern)
     else {
         println!(
-            "No trenches created for {:?}: initial site intersection failed at rotation {}",
-            config.pattern_name, rotation
+            "No trenches created for {:?}: initial site intersection failed for placement {:?}",
+            config.pattern_name, placement
         );
         return None;
     };
+
     let mut current_coverage = calculate_coverage(&intersection, limit_of_excavation);
 
-    // println!("Target coverage: {}", target_coverage);
-
-    while (iteration <= 50) && !check_coverage(current_coverage, target_coverage) {
-        // println!("\nCurrent iteration: {}", iteration);
-        // println!("Current spacing: {}", current_spacing);
-        // println!("Current coverage: {}", current_coverage);
-
-        // adjust current_spacing to get closer to target_coverage
-        let adjustment_factor = 0.94_f64.powf(iteration as f64); // Bumped this from 0.82 due to the increase in iterations.
+    while iteration <= 50 && !check_coverage(current_coverage, target_coverage) {
+        let adjustment_factor = 0.94_f64.powf(iteration as f64);
         let error = (target_coverage - current_coverage) / target_coverage;
+
         if error < 0.0 {
             current_spacing *= 1.0 + -error * adjustment_factor;
         } else {
             current_spacing /= 1.0 + error * adjustment_factor;
         }
 
-        // check spacing is not too small
         if spacing_smaller_than_minimum(&current_spacing, &config.minimum_spacing) {
             println!(
                 "Spacing too small for {:?}: target {:.2} current {:.2}",
@@ -345,47 +425,155 @@ fn adjust_trench_layout_to_coverage(
             return None;
         }
 
-        current_trench_pattern = get_layout_from_spacing(
+        current_trench_pattern = get_positioned_layout(
             *config,
             *max_distance_from_centroid,
             centroid,
             current_spacing,
-        )
-        .rotate_around_point(rotation as f64, centroid);
+            placement,
+        );
 
         let Some(next_intersection) =
             safe_intersection(limit_of_excavation, &current_trench_pattern)
         else {
             println!(
-                "No trenches created for {:?}: site intersection failed at rotation {}, iteration {}",
-                config.pattern_name,
-                rotation,
-                iteration
+                "No trenches created for {:?}: site intersection failed for placement {:?}, iteration {}",
+                config.pattern_name, placement, iteration
             );
             return None;
         };
 
         intersection = next_intersection;
-
         current_coverage = calculate_coverage(&intersection, limit_of_excavation);
         iteration += 1;
     }
 
     if check_coverage(current_coverage, target_coverage) {
-        // Count the individual trenches or pits that intersect the site.
         let trenches_deployed = current_trench_pattern
             .iter()
             .filter(|polygon| polygon.intersects(limit_of_excavation))
             .count() as u64;
+
         Some(TrenchLayout {
             layout: intersection,
             trenches_deployed,
+            layout_index,
+            angle_degrees: placement.angle_degrees,
+            x_phase: placement.x_phase,
+            y_phase: placement.y_phase,
+            achieved_coverage: current_coverage,
         })
     } else {
         println!(
-            "Failed {:?}: target {:.2} achieved {:.2} after {} iterations",
-            config.pattern_name, target_coverage, current_coverage, iteration
+            "Failed {:?}: target {:.2} achieved {:.2} after {} iterations for placement {:?}",
+            config.pattern_name, target_coverage, current_coverage, iteration, placement
         );
         None
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn placement_generation_is_reproducible() {
+        let structure =
+            TrenchConfig::continuous(2.0, Distribution::Coverage(Percentage::from(5.0))).structure;
+
+        let first = generate_placements(structure, 180, 20261124);
+        let repeated = generate_placements(structure, 180, 20261124);
+        let different = generate_placements(structure, 180, 20261125);
+
+        assert_eq!(first, repeated);
+        assert_ne!(first, different);
+    }
+    #[test]
+    fn generated_placements_have_valid_ranges() {
+        let structure =
+            TrenchConfig::continuous(2.0, Distribution::Coverage(Percentage::from(5.0))).structure;
+
+        let placements = generate_placements(structure, 180, 20261124);
+        let maximum_angle = structure.get_rotational_symmetry() as f64;
+
+        assert_eq!(placements.len(), 180);
+
+        for placement in placements {
+            assert!(placement.angle_degrees >= 0.0);
+            assert!(placement.angle_degrees < maximum_angle);
+            assert!(placement.x_phase >= 0.0);
+            assert!(placement.x_phase < 1.0);
+            assert!(placement.y_phase >= 0.0);
+            assert!(placement.y_phase < 1.0);
+        }
+    }
+    #[test]
+    fn placement_phase_moves_the_layout() {
+        let config = TrenchConfig::continuous(2.0, Distribution::Coverage(Percentage::from(5.0)));
+        let centroid = Point::new(0.0, 0.0);
+        let maximum_distance = 100.0;
+        let spacing = 20.0;
+
+        let original_layout = get_layout_from_spacing(config, maximum_distance, centroid, spacing);
+
+        let zero_phase_layout = get_positioned_layout(
+            config,
+            maximum_distance,
+            centroid,
+            spacing,
+            Placement {
+                angle_degrees: 0.0,
+                x_phase: 0.0,
+                y_phase: 0.0,
+            },
+        );
+
+        let shifted_layout = get_positioned_layout(
+            config,
+            maximum_distance,
+            centroid,
+            spacing,
+            Placement {
+                angle_degrees: 0.0,
+                x_phase: 0.5,
+                y_phase: 0.0,
+            },
+        );
+
+        assert_eq!(original_layout, zero_phase_layout);
+        assert_ne!(original_layout, shifted_layout);
+    }
+    #[test]
+    fn y_phase_moves_an_array_layout() {
+        let config =
+            TrenchConfig::parallel_array(2.0, 30.0, Distribution::Coverage(Percentage::from(5.0)));
+        let centroid = Point::new(0.0, 0.0);
+        let maximum_distance = 100.0;
+        let spacing = 20.0;
+
+        let zero_phase_layout = get_positioned_layout(
+            config,
+            maximum_distance,
+            centroid,
+            spacing,
+            Placement {
+                angle_degrees: 0.0,
+                x_phase: 0.0,
+                y_phase: 0.0,
+            },
+        );
+
+        let shifted_layout = get_positioned_layout(
+            config,
+            maximum_distance,
+            centroid,
+            spacing,
+            Placement {
+                angle_degrees: 0.0,
+                x_phase: 0.0,
+                y_phase: 0.5,
+            },
+        );
+
+        assert_ne!(zero_phase_layout, shifted_layout);
     }
 }

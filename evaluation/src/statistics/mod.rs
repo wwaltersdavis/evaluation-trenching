@@ -1,7 +1,9 @@
 pub mod csv_output;
 pub mod detection_stats;
 
-pub use csv_output::write_to_csv;
+pub use csv_output::{
+    write_eligibility_to_csv, write_layouts_to_csv, write_to_csv, EligibilityRow, LayoutRow,
+};
 pub use detection_stats::*;
 
 use crate::Percentage;

@@ -5,6 +5,11 @@ use std::collections::HashSet;
 pub struct TrenchLayout {
     pub layout: MultiPolygon<f64>,
     pub trenches_deployed: u64,
+    pub layout_index: usize,
+    pub angle_degrees: f64,
+    pub x_phase: f64,
+    pub y_phase: f64,
+    pub achieved_coverage: f64,
 }
 
 #[derive(Debug, Clone)]
@@ -31,6 +36,7 @@ impl ArchFeature {
 #[derive(Debug)]
 pub struct TestLocation {
     pub site_name: String,
+    pub loe_id: String,
     pub limit_of_excavation: Polygon,
     pub features: Vec<ArchFeature>,
 }
