@@ -4,8 +4,8 @@ use crate::{
 };
 use anyhow::Result;
 use csv::Writer;
+use evaluation::{Distribution, TrenchLayout};
 use serde::Serialize;
-use evaluation::Distribution;
 
 fn two_dp(value: f64) -> String {
     format!("{:.2}", value)
@@ -18,6 +18,7 @@ fn four_dp(value: f64) -> String {
 #[derive(Debug, Serialize)]
 struct Row<'a> {
     site: &'a str,
+    loe_id: &'a str,
     pattern: &'a str,
     distribution: String,
     category: &'a str,
@@ -54,11 +55,43 @@ struct Row<'a> {
     p75_run_percentage_area_found: String,
     p95_run_percentage_area_found: String,
 }
-
+#[derive(Debug, Serialize)]
+pub struct LayoutRow {
+    site: String,
+    loe_id: String,
+    pattern: String,
+    distribution: String,
+    seed: u64,
+    requested_layouts_per_loe: usize,
+    layout_index: usize,
+    angle_degrees: f64,
+    x_phase: f64,
+    y_phase: f64,
+    achieved_coverage: f64,
+    trenches_deployed: u64,
+    features_found: u32,
+    features_missed: u32,
+    percentage_features_found: f64,
+    feature_area_found_m2: f64,
+    feature_area_missed_m2: f64,
+    percentage_feature_area_found: f64,
+}
+#[derive(Debug, Serialize)]
+pub struct EligibilityRow {
+    site: String,
+    loe_id: String,
+    pattern: String,
+    distribution: String,
+    seed: u64,
+    requested_layouts: usize,
+    retained_layouts: usize,
+    failed_layouts: usize,
+}
 impl<'a> Row<'a> {
     #[rustfmt::skip]
     pub fn from_stats(
         site: &'a str,
+        loe_id: &'a str,
         category: &'a str,
         category_value: &'a str,
         stats: &DetectionStats,
@@ -76,6 +109,7 @@ impl<'a> Row<'a> {
         };
         Row {
             site,
+            loe_id,
             pattern: pattern_name,
             distribution: distribution.to_file_string(),
             category,
@@ -114,7 +148,81 @@ impl<'a> Row<'a> {
         }
     }
 }
+impl LayoutRow {
+    pub fn from_stats(
+        site: &str,
+        loe_id: &str,
+        config: &TrenchConfig,
+        distribution: &Distribution,
+        seed: u64,
+        requested_layouts_per_loe: usize,
+        layout: &TrenchLayout,
+        stats: &DetectionStats,
+    ) -> Self {
+        Self {
+            site: site.to_string(),
+            loe_id: loe_id.to_string(),
+            pattern: config.pattern_name.as_str().to_string(),
+            distribution: distribution.to_file_string(),
+            seed,
+            requested_layouts_per_loe,
+            layout_index: layout.layout_index,
+            angle_degrees: layout.angle_degrees,
+            x_phase: layout.x_phase,
+            y_phase: layout.y_phase,
+            achieved_coverage: layout.achieved_coverage,
+            trenches_deployed: layout.trenches_deployed,
+            features_found: stats.total_features_found,
+            features_missed: stats.total_features_missed,
+            percentage_features_found: stats.feature_found_percentage().0,
+            feature_area_found_m2: stats.total_area_found,
+            feature_area_missed_m2: stats.total_area_missed,
+            percentage_feature_area_found: stats.area_found_percentage().0,
+        }
+    }
+}
 
+impl EligibilityRow {
+    pub fn new(
+        site: &str,
+        loe_id: &str,
+        config: &TrenchConfig,
+        seed: u64,
+        requested_layouts: usize,
+        retained_layouts: usize,
+    ) -> Self {
+        Self {
+            site: site.to_string(),
+            loe_id: loe_id.to_string(),
+            pattern: config.pattern_name.as_str().to_string(),
+            distribution: config.distribution.to_file_string(),
+            seed,
+            requested_layouts,
+            retained_layouts,
+            failed_layouts: requested_layouts.saturating_sub(retained_layouts),
+        }
+    }
+}
+pub fn write_layouts_to_csv(output_path: &str, rows: &[LayoutRow]) -> Result<()> {
+    let mut wtr = Writer::from_path(output_path)?;
+
+    for row in rows {
+        wtr.serialize(row)?;
+    }
+
+    wtr.flush()?;
+    Ok(())
+}
+pub fn write_eligibility_to_csv(output_path: &str, rows: &[EligibilityRow]) -> Result<()> {
+    let mut wtr = Writer::from_path(output_path)?;
+
+    for row in rows {
+        wtr.serialize(row)?;
+    }
+
+    wtr.flush()?;
+    Ok(())
+}
 pub fn write_to_csv(
     output_path: &str,
     config: &TrenchConfig,
@@ -122,9 +230,10 @@ pub fn write_to_csv(
     all_stats_map: StatsMap,
 ) -> Result<()> {
     let mut wtr = Writer::from_path(output_path)?;
-    for ((site, category, category_value), stats) in all_stats_map.0 {
+    for ((site, loe_id, category, category_value), stats) in all_stats_map.0 {
         wtr.serialize(Row::from_stats(
             site,
+            loe_id,
             category,
             category_value,
             &stats,

@@ -67,6 +67,7 @@ pub fn read_all_test_location_data(selected_layer: Option<&str>) -> Result<Vec<T
                     }
                     test_locations.push(TestLocation {
                         site_name: site.to_string(),
+                        loe_id: i.to_string(),
                         limit_of_excavation,
                         features: arch_features,
                     });

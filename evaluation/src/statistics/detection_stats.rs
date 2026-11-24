@@ -1,6 +1,6 @@
 use crate::statistics::{mean, percentile, standard_deviation};
-use std::collections::HashMap;
 use evaluation::Percentage;
+use std::collections::HashMap;
 
 /// Represents the detection statistics for a given group of features.
 /// The features are grouped by site, category, and category value e.g.
@@ -135,8 +135,8 @@ impl DetectionStats {
     }
 }
 
-// Key: (site, category, category_value)
-pub struct StatsMap<'a>(pub HashMap<(&'a str, &'a str, &'a str), DetectionStats>);
+// Key: (site, loe_id, category, category_value)
+pub struct StatsMap<'a>(pub HashMap<(&'a str, &'a str, &'a str, &'a str), DetectionStats>);
 
 impl<'a> StatsMap<'a> {
     pub fn new() -> Self {
@@ -145,15 +145,17 @@ impl<'a> StatsMap<'a> {
 
     fn get_key(
         site: &'a str,
+        loe_id: &'a str,
         category: &'a str,
         category_value: &'a str,
-    ) -> (&'a str, &'a str, &'a str) {
-        (site, category, category_value)
+    ) -> (&'a str, &'a str, &'a str, &'a str) {
+        (site, loe_id, category, category_value)
     }
 
     pub fn add_from_feature(
         &mut self,
         site: &'a str,
+        loe_id: &'a str,
         category: &'a str,
         category_value: &'a str,
         feature_found: bool,
@@ -161,8 +163,8 @@ impl<'a> StatsMap<'a> {
         area_missed: f64,
         trenches_deployed: u32,
     ) {
-        for site in [site, "All"] {
-            let key = Self::get_key(site, category, category_value);
+        for (site_key, loe_key) in [(site, loe_id), (site, "All"), ("All", "All")] {
+            let key = Self::get_key(site_key, loe_key, category, category_value);
             let stats = self.0.entry(key).or_insert_with(DetectionStats::new);
 
             if feature_found {
@@ -180,8 +182,8 @@ impl<'a> StatsMap<'a> {
 
     pub fn add_from_maps(&mut self, stats_maps: &Vec<StatsMap<'a>>) {
         for stats_map in stats_maps {
-            for ((site, category, category_value), stats) in &stats_map.0 {
-                let key = Self::get_key(site, category, category_value);
+            for ((site, loe_id, category, category_value), stats) in &stats_map.0 {
+                let key = Self::get_key(site, loe_id, category, category_value);
                 let entry = self.0.entry(key).or_insert_with(DetectionStats::new);
 
                 entry.total_features_found += stats.total_features_found;
@@ -208,7 +210,7 @@ impl<'a> StatsMap<'a> {
     }
 
     pub fn general_stats_message(&self) -> String {
-        if let Some(stats) = self.0.get(&("All", "All", "All")) {
+        if let Some(stats) = self.0.get(&("All", "All", "All", "All")) {
             format!(
                 "Total features found: {} \nTotal features missed: {} \nPercentage found: {:.2}% \nTotal trenches deployed: {}",
                 stats.total_features_found,
